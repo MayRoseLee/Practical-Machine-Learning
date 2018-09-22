@@ -1,0 +1,129 @@
+author: May Robinson
+
+Practical Machine Learning Prediction Assignment
+
+The measurement data were collected from accelerometers on the belt, forearm, arm, and dumbell of 6 
+participants. Participants performed barbell lifts, correctly and incorrectly, in 5 different
+ways. The five different ways corresponded to the "classe" variable with five levels 
+(A B C D E).To calculate the out-of-sample error, the training data was split into a training set and a 
+test set.  
+The goal of this assignment was to predict classe given the measurement data variables. The caret package was used.  A tree model was computed initially with an accuracy of .5717.  Next a random forest model was fitted, which resulted in a far better accuracy of .9980. 
+The tree model took 4.22 seconds to compute, while the random forest model took 271.61 seconds.
+Random forest model was chosen to predict 20 different test cases.
+==============================================================================================                                                                                                    
+Read in training data
+```{r}
+training <-read.csv("pml-training.csv")
+testing <-read.csv("pml-testing.csv")
+```
+
+
+There were 160 variables in the training and test sets. Decide which variables 
+to keep in the model. Build a new training data set and test set. 
+Remove columns at the beginning of the training set (with names and timestamps) 
+that do not contribute to the model. 
+```{r}
+library(caret)
+library(dplyr)
+training<-training[,7:160]
+testing<-testing[,7:160]
+```
+Remove columns with NAs, since Caret does not like NAs
+```{r}
+complete_data<-apply(!is.na(training),2,sum)>19621
+training<-training[,complete_data]
+testing<-testing[,complete_data]
+```
+Remove columns with  skewness, kurtosis, min, max and amplitudes 
+These values were functions of other variables in the data and were not necessary
+for the model.
+```{r}
+training <- select(training,-kurtosis_roll_belt,-kurtosis_picth_belt,
+          -kurtosis_yaw_belt,-skewness_roll_belt,-skewness_roll_belt.1,
+-skewness_yaw_belt,-max_yaw_belt,-min_yaw_belt,-amplitude_yaw_belt,
+-kurtosis_roll_arm,-kurtosis_picth_arm,-kurtosis_yaw_arm,-skewness_roll_arm,
+-skewness_pitch_arm,-skewness_yaw_arm, -kurtosis_roll_dumbbell,
+-kurtosis_picth_dumbbell,-kurtosis_yaw_dumbbell,-skewness_roll_dumbbell,
+-skewness_pitch_dumbbell,-skewness_yaw_dumbbell,-max_yaw_dumbbell
+-min_yaw_dumbbell,amplitude_yaw_dumbbell,-max_yaw_dumbbell,-min_yaw_dumbbell,
+-amplitude_yaw_dumbbell,-kurtosis_roll_forearm,-kurtosis_picth_forearm,
+-kurtosis_yaw_forearm,-skewness_roll_forearm,-skewness_pitch_forearm,
+
+-skewness_yaw_forearm,-max_yaw_forearm, -min_yaw_forearm,- amplitude_yaw_forearm)     
+                                           
+                    
+
+testing <-select(testing,-kurtosis_roll_belt,-kurtosis_picth_belt,
+                 -kurtosis_yaw_belt,-skewness_roll_belt,-skewness_roll_belt.1,
+                 -skewness_yaw_belt,-max_yaw_belt,-min_yaw_belt,-amplitude_yaw_belt,
+                 -kurtosis_roll_arm,-kurtosis_picth_arm,-kurtosis_yaw_arm,-skewness_roll_arm,
+                 -skewness_pitch_arm,-skewness_yaw_arm, -kurtosis_roll_dumbbell,
+                 -kurtosis_picth_dumbbell,-kurtosis_yaw_dumbbell,-skewness_roll_dumbbell,
+                 -skewness_pitch_dumbbell,-skewness_yaw_dumbbell,-max_yaw_dumbbell
+                 -min_yaw_dumbbell,-amplitude_yaw_dumbbell,-max_yaw_dumbbell,-min_yaw_dumbbell,
+                 -amplitude_yaw_dumbbell,-kurtosis_roll_forearm,-kurtosis_picth_forearm,
+                 -kurtosis_yaw_forearm,-skewness_roll_forearm,-skewness_pitch_forearm,
+                 
+                 -skewness_yaw_forearm,-max_yaw_forearm, -min_yaw_forearm,
+                 - amplitude_yaw_forearm)
+dim(training)
+dim(testing)
+```
+Subset the training set into a training data set and test data set
+```{r}
+set.seed(1234)
+training_dat <- createDataPartition( training$classe, p = 0.7, list = FALSE)
+trainData <- training[training_dat, ]
+testData <- training[-training_dat, ]
+dim(trainData)
+dim(testData)
+```
+Fit a tree model using the caret package.  To use cross validation, include the trControl 
+specification, with "cv" specifying cross validation, 3 for the number of folds.
+```{r}
+model_tree <- train(classe ~ ., data = trainData, method = 'rpart',
+                  trControl=trainControl(method="cv", number=3, allowParallel=T))
+system.time( train(classe ~ ., data = trainData, method = 'rpart',
+                   trControl=trainControl(method="cv", number=3, allowParallel=T)))
+print(model_tree)
+
+```
+The accuracy of the tree model was .5717.
+The in-sample error of the tree model was 1- .5717= .4283*100= 42.83%.
+Calculate the out-of-sample error
+```{r}
+prediction <- predict(model_tree, testData)
+confusionMatrix(prediction, testData$classe)
+```
+Out-of-sample error was 1- .489 = .5110 * 100 = 51.10%.
+Try for a better accuracy by fitting a random forest model using the caret package.To use cross validation,include the "trControl=" specification in the caret train function,
+with "cv" for cross validation,  3 for the number of folds. 
+```{r}
+model_rf <- train(classe ~ ., data = trainData, method = 'rf',
+                  trControl=trainControl(method="cv", number=3, allowParallel=T))
+system.time(train(classe ~ ., data = trainData, method = 'rf',
+                  trControl=trainControl(method="cv", number=3, allowParallel=T)))
+```
+Print out results of random forest model
+```{r}
+print(model_rf)
+```
+The Accuracy of this model was .9924.
+From this calculate the in-sample error rate: (1 - .9924 = 0.0076 * 100)= 0.76%.
+
+Use the test set to calculate the out-of-sample error rate.
+```{r}
+pred_test <- predict(model_rf, testData)
+outOfSampleError.accuracy <- sum(pred_test == testData$classe)/length(pred_test)
+
+outOfSampleError.accuracy
+```
+The out-of-sample accuracy was .9980
+to double-check,use confusionMatrix to get out-of-sample accuracy.
+```{r}
+confusionMatrix(pred_test, testData$classe)
+```
+The out-of-sample accuracy was .998
+ out-Of-Sample Error = 1 - .9980 = .0020
+The percentage of out-of-sample error was  .0020 * 100 =0.20%  .
+
